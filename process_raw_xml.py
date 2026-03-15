@@ -1,6 +1,9 @@
 # This script processes the raw .xml files in the canonical greek lit repo, 
 # purges them of their xml scaffolding, and stores the text body as .txt 
 # files.
+# Note on the source data: We have used data from the following repos: 
+# https://github.com/OpenGreekAndLatin/First1KGreek/
+# https://github.com/PerseusDL/canonical-greekLit/
 import os
 import re
 from glob import glob
@@ -14,7 +17,8 @@ def main():
         "professional data entry", 
         "The following",
         "optical",
-        "Notes"
+        "Notes",
+        "encoded"
     ]
 
     authors = []
@@ -26,10 +30,7 @@ def main():
     # Iterate over all the relevant .xml files, and extract the raw text, 
     # the title and the author, and store each as a text file
     idx = 0
-    for f in glob(
-        "data/xml/**/*grc*.xml", 
-        recursive=True
-    ):
+    for f in glob("data/xml/**/*grc*.xml", recursive=True):
         if "__cts__" not in f and "INTF" not in f:
             with open(f, "r", errors="ignore", encoding="utf-8") as g:
                 x = g.read()
@@ -50,8 +51,8 @@ def main():
                 if authors[-1] != authors[-2]:
                     idx = 0
 
-            fname = f"{author_tags[0].text}-{idx}"
-            fname = fname.replace('\n', '').replace('\t', '')
+            fname = f"{author_tags[0].text}{idx}"
+            fname = "".join(c for c in fname if c.isalnum())
             text = f"{title_tags[0].text} by {author_tags[0].text}" + " \n " \
                 + " \n ".join(el.text for el in text_tags if not any(w in el.text for w in exclude))
             
