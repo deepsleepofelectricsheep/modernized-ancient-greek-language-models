@@ -1,16 +1,19 @@
-# This script processes the raw .xml files in the canonical greek lit repo, 
-# purges them of their xml scaffolding, and stores the text body as .txt 
-# files.
-# Note on the source data: We have used data from the following repos: 
-# https://github.com/OpenGreekAndLatin/First1KGreek/
-# https://github.com/PerseusDL/canonical-greekLit/
+"""
+This script processes the raw .xml files in the canonical greek lit repo, 
+purges them of their xml scaffolding, and stores the text body as .txt 
+files.
+Note on the source data: We have used data from the following repos: 
+https://github.com/OpenGreekAndLatin/First1KGreek/
+https://github.com/PerseusDL/canonical-greekLit/
+"""
 import os
 import re
 from glob import glob
 from bs4 import BeautifulSoup
 
 
-def main():
+def process_raw_xml():
+    # Exclusion list of english words that appear in the by-line of the Ancient Greek texts.
     exclude = [
         "This pointer", 
         "Keyboarding", 
@@ -18,7 +21,9 @@ def main():
         "The following",
         "optical",
         "Notes",
-        "encoded"
+        "encoded",
+        "copyright",
+        "Lace"
     ]
 
     authors = []
@@ -63,4 +68,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    process_raw_xml()
