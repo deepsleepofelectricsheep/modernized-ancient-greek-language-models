@@ -133,6 +133,7 @@ if __name__ == "__main__":
 
     history = {"training_loss": [0] * arguments.epochs}
 
+    print(f"Starting training loop...")
     for epoch in range(arguments.epochs):
         model.train()
         for batch in tqdm.tqdm(dataloader):
