@@ -12,6 +12,10 @@ import os
 import argparse
 import torch
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import (
+    LinearLR,
+    SequentialLR
+)
 from torch.nn import functional as F
 from torch.utils.data import (
     Dataset,
@@ -31,6 +35,8 @@ def return_arguments(arguments: argparse.Namespace = None) -> argparse.Namespace
 
     # General arguments:
     arguments.checkpoint = "google-bert/bert-base-multilingual-cased"
+    arguments.save = True
+    arguments.save_fname = "ancient-greek-bert.pt"
 
     # Dataset arguments:
     arguments.raw_text_dir = "data/text"
@@ -38,11 +44,13 @@ def return_arguments(arguments: argparse.Namespace = None) -> argparse.Namespace
     arguments.max_sequence_length = 512
     arguments.batch_size = 8
     arguments.percent_masked = 15
-    arguments.file_limit = 10
+    arguments.file_limit = 3
 
     # Training arguments
-    arguments.epochs = 5
-    arguments.lr = 3e-4
+    arguments.epochs = 2
+    arguments.lr = 1e-4
+    arguments.warmup_steps = 25
+    arguments.decay_steps = 25
     arguments.gradient_clipping = True
 
     return arguments
@@ -115,7 +123,12 @@ if __name__ == "__main__":
     dataloader = return_dataloader_for_mlm(arguments)
 
     model = CustomBertModel.from_pretrained(arguments.checkpoint).to(device)
+
     optimizer = AdamW(model.parameters(), arguments.lr)
+    warmup_scheduler = LinearLR(optimizer, start_factor=1/3, end_factor=1, total_iters=arguments.warmup_steps)
+    decay_scheduler = LinearLR(optimizer, start_factor=1, end_factor=1/3, total_iters=arguments.decay_steps)
+    scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, decay_scheduler], milestones=[arguments.warmup_steps])
+
     loss_fn = F.cross_entropy
 
     history = {"training_loss": [0] * arguments.epochs}
@@ -142,9 +155,19 @@ if __name__ == "__main__":
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
             optimizer.step()
+            scheduler.step()
 
             history["training_loss"][epoch] += loss.item()
 
         history["training_loss"][epoch] /= len(dataloader)
         print(f"Epoch: {epoch + 1} of {arguments.epochs}. Average loss: {history['training_loss'][epoch]}")
+
+        if arguments.save:
+            torch.save({
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
+                "history": history
+            }, f"saved_models/{arguments.save_fname}")
 
