@@ -10,10 +10,17 @@ import os
 import re
 from glob import glob
 from bs4 import BeautifulSoup
+from collections import defaultdict
+from tabulate import tabulate
+import nltk
+nltk.download('punkt_tab')
+import tqdm
 
 
 def process_raw_xml():
-    # Exclusion list of english words that appear in the by-line of the Ancient Greek texts.
+    # Store xml data as clean raw text
+
+    # Exclusion list of english words that appear in the by-line of the Ancient Greek texts
     exclude = [
         "This pointer", 
         "Keyboarding", 
@@ -67,5 +74,29 @@ def process_raw_xml():
             idx += 1
 
 
+def print_dataset_summary(limit=50):
+    # Start with number of documents and number of documents per author
+    docs_per_author = defaultdict(int)
+    lines_per_author = defaultdict(int)
+
+    for file in tqdm.tqdm(os.listdir("data/text")):
+        author = "".join([c for c in file if not c.isdigit()]).split(".")[0]
+        docs_per_author[author] += 1
+
+        with open(f"data/text/{file}", "r") as f:
+            g = f.read()
+            lines_per_author[author] += len(nltk.sent_tokenize(g))
+    
+    summary = tabulate(
+        [
+            [author, docs_per_author[author], lines_per_author[author]]
+            for author in sorted(docs_per_author, key=docs_per_author.get, reverse=True)
+        ][:limit],
+        headers=["Author", "Number of documents", "Number of lines of text"]
+    )
+    print(summary)
+
+
 if __name__ == "__main__":
     process_raw_xml()
+    print_dataset_summary()
