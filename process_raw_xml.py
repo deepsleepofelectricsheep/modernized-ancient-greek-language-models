@@ -8,6 +8,8 @@ https://github.com/PerseusDL/canonical-greekLit/
 """
 import os
 import re
+import random
+random.seed(112310)
 from glob import glob
 from bs4 import BeautifulSoup
 from collections import defaultdict
@@ -97,6 +99,83 @@ def print_dataset_summary(limit=50):
     print(summary)
 
 
+def prepare_data_for_authorship_classification():
+    # Following the instructions outlined in Yamshchikov et al.'s paper,
+    # we will limit the dataset to works by the following authors:
+
+    #     Galenus, Origenes, Plutarch, Cassius Dio, Flavius Josephus, 
+    #     Philo Judaeus, Athenaeus, Claudius Ptolemaeus, Aelius Aristides, 
+    #     Strabo, Lucianus, Clemens Alexandrinus, Appianus, Pausanias, 
+    #     Sextus Empiricus, Dio Chrysostomus.
+
+    # Furthermore, we will randomly n sentences, where n is the smallest
+    # number of sentences attributable to any of the above authors, to 
+    # avoid bias.
+
+    selected_authors = [
+        "Galen", "Origenes", "Plutarch", "CassiusDio", "FlaviusJosephus",
+        "PhiloJudaeus", "Athenaeus", "Claudius", "AeliusAristides", 
+        "Strabo", "Lucian", "ClementofAlexandria", "Appian", "Pausanias",
+        "Sextus", "DioChrysostom"
+    ]
+
+    sentences_by_author = {}
+    for file in tqdm.tqdm(os.listdir("data/text")):
+        author = "".join([c for c in file if not c.isdigit()]).split(".")[0]
+        for idx, selected_author in enumerate(selected_authors):
+            if selected_author in author:
+                with open(f"data/text/{file}", "r") as f:
+                    g = f.read().replace('\n', ' ').replace('\r', '')
+                if idx in sentences_by_author:
+                    sentences_by_author[idx].extend(nltk.sent_tokenize(g)[1:])
+                else:
+                    sentences_by_author[idx] = nltk.sent_tokenize(g)[1:]
+
+    if not os.path.exists("data/authorship_classification"):
+        os.makedirs("data/authorship_classification")
+
+    # Find the minimum number of sentences
+    min_sentence_cnt = float("inf")
+    for author_idx in sentences_by_author:
+        if len(sentences_by_author[author_idx]) < min_sentence_cnt:
+            min_sentence_cnt = len(sentences_by_author[author_idx])
+
+    # Randomly sample `min_sentence_cnt` number of sentences per author
+    for author_idx in sentences_by_author:
+        sentences_by_author[author_idx] = random.sample(sentences_by_author[author_idx], min_sentence_cnt)
+
+    # Randomly shuffle into train (80%), dev (10%) and test (10%) sets, and store dataset
+    # Randomly sample `min_sentence_cnt` number of sentences per author
+
+    with open(f"data/authorship_classification/train.txt", "a") as f:
+        f.write(f"sentence_id, sentence, author_id \n")
+    with open(f"data/authorship_classification/dev.txt", "a") as f:
+        f.write(f"sentence_id, sentence, author_id \n")
+    with open(f"data/authorship_classification/test.txt", "a") as f:
+        f.write(f"sentence_id, sentence, author_id \n")
+
+    cnt_80_pct = int(min_sentence_cnt * 0.8)
+    cnt_10_pct = int(min_sentence_cnt * 0.1)
+
+    for author_idx in tqdm.tqdm(sentences_by_author):
+
+        random.shuffle(sentences_by_author[author_idx])
+        train = sentences_by_author[author_idx][:cnt_80_pct]
+        dev = sentences_by_author[author_idx][cnt_80_pct:cnt_80_pct+cnt_10_pct]
+        test = sentences_by_author[author_idx][cnt_80_pct+cnt_10_pct:cnt_80_pct+cnt_10_pct+cnt_10_pct]
+        
+        with open(f"data/authorship_classification/train.txt", "a") as f:
+            for idx, sentence in enumerate(train):
+                f.write(f"{idx}, {sentence}, {author_idx} \n")
+        with open(f"data/authorship_classification/dev.txt", "a") as f:
+            for idx, sentence in enumerate(dev):
+                f.write(f"{idx}, {sentence}, {author_idx} \n")
+        with open(f"data/authorship_classification/test.txt", "a") as f:
+            for idx, sentence in enumerate(test):
+                f.write(f"{idx}, {sentence}, {author_idx} \n")        
+    
+
 if __name__ == "__main__":
     process_raw_xml()
     print_dataset_summary()
+    prepare_data_for_authorship_classification()
