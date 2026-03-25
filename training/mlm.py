@@ -115,9 +115,9 @@ def return_dataloader_for_mlm(arguments: argparse.Namespace = None) -> DataLoade
     return dataloader
 
 
-if __name__ == "__main__":
+def train(arguments: argparse.Namespace = None) -> None:
 
-    arguments = return_arguments()
+    arguments = return_arguments() if arguments is None else arguments
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     dataloader = return_dataloader_for_mlm(arguments)
@@ -172,3 +172,7 @@ if __name__ == "__main__":
                 "history": history
             }, f"saved_models/{arguments.save_fname}")
 
+
+if __name__ == "__main__":
+
+    train()
