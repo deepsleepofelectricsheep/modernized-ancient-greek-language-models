@@ -125,7 +125,7 @@ def prepare_data_for_authorship_classification():
         for idx, selected_author in enumerate(selected_authors):
             if selected_author in author:
                 with open(f"data/text/{file}", "r") as f:
-                    g = f.read().replace('\n', ' ').replace('\r', '')
+                    g = f.read().replace("\n", " ").replace("\r", "").replace("\t", " ")
                 if idx in sentences_by_author:
                     sentences_by_author[idx].extend(nltk.sent_tokenize(g)[1:])
                 else:
@@ -148,11 +148,11 @@ def prepare_data_for_authorship_classification():
     # Randomly sample `min_sentence_cnt` number of sentences per author
 
     with open(f"data/authorship_classification/train.txt", "a") as f:
-        f.write(f"sentence_id, sentence, author_id \n")
+        f.write(f"sentence_id \t sentence \t author_id \n")
     with open(f"data/authorship_classification/dev.txt", "a") as f:
-        f.write(f"sentence_id, sentence, author_id \n")
+        f.write(f"sentence_id \t sentence \t author_id \n")
     with open(f"data/authorship_classification/test.txt", "a") as f:
-        f.write(f"sentence_id, sentence, author_id \n")
+        f.write(f"sentence_id \t sentence \t author_id \n")
 
     cnt_80_pct = int(min_sentence_cnt * 0.8)
     cnt_10_pct = int(min_sentence_cnt * 0.1)
@@ -166,16 +166,16 @@ def prepare_data_for_authorship_classification():
         
         with open(f"data/authorship_classification/train.txt", "a") as f:
             for idx, sentence in enumerate(train):
-                f.write(f"{idx}, {sentence}, {author_idx} \n")
+                f.write(f"{idx} \t {sentence} \t {author_idx} \n")
         with open(f"data/authorship_classification/dev.txt", "a") as f:
             for idx, sentence in enumerate(dev):
-                f.write(f"{idx}, {sentence}, {author_idx} \n")
+                f.write(f"{idx} \t {sentence} \t {author_idx} \n")
         with open(f"data/authorship_classification/test.txt", "a") as f:
             for idx, sentence in enumerate(test):
-                f.write(f"{idx}, {sentence}, {author_idx} \n")        
+                f.write(f"{idx} \t {sentence} \t {author_idx} \n")        
     
 
 if __name__ == "__main__":
-    process_raw_xml()
-    print_dataset_summary()
+    # process_raw_xml()
+    # print_dataset_summary()
     prepare_data_for_authorship_classification()
