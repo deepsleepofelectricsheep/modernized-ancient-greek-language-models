@@ -162,6 +162,9 @@ class CustomBertModel(nn.Module):
     def hidden_state_to_token(self, hidden_state):
         return torch.einsum("b t d, v d -> b t v", hidden_state, self.embedding_layer.word_embeddings.weight)
     
+    def initialize_classification_head(self, n_classes=16):
+        self.head = nn.Linear(self.config.hidden_size, n_classes)
+
     def from_pretrained(checkpoint="google-bert/bert-base-multilingual-cased", config=None):
         hf_bert_model = BertModel.from_pretrained(checkpoint).eval()
         config = hf_bert_model.config if config is None else config
