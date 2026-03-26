@@ -41,13 +41,13 @@ def return_arguments(arguments: argparse.Namespace = None) -> argparse.Namespace
     arguments.data_dir = "data/authorship_classification"
     arguments.max_sequence_length = 512
     arguments.batch_size = 16
-    arguments.batch_limit = 50
+    arguments.batch_limit = 100
 
     # Training arguments
     arguments.epochs = 2
-    arguments.lr = 1e-4
-    arguments.warmup_steps = 25
-    arguments.decay_steps = 25
+    arguments.lr = 3e-4
+    arguments.warmup_steps = 100
+    arguments.decay_steps = 100
     arguments.gradient_clipping = True
 
     return arguments
@@ -203,7 +203,7 @@ def train(arguments: argparse.Namespace = None) -> None:
 
         history["dev_accuracy_per_epoch"][epoch] /= train_datasize
         print(
-            f"Epoch: {epoch + 1} of {arguments.epochs}." 
+            f"Epoch {epoch + 1}/{arguments.epochs}. " 
             f"Dev accuracy: {history['dev_accuracy_per_epoch'][epoch]}." 
         )
 
