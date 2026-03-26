@@ -94,7 +94,7 @@ def return_dataloaders_for_authorship_clf(
     test_ds = DatasetForAuthorshipClf(test_data[:arguments.batch_limit*arguments.batch_size] if arguments.batch_limit else test_data)
 
     train_dl = DataLoader(train_ds, batch_size=arguments.batch_size, shuffle=True, collate_fn=collate_fn)
-    dev_dl = DataLoader(dev_ds, batch_size=arguments.batch_size, shuffle=False, collate_fn=collate_fn)
+    dev_dl = DataLoader(dev_ds, batch_size=arguments.batch_size, shuffle=True, collate_fn=collate_fn)
     test_dl = DataLoader(test_ds, batch_size=arguments.batch_size, shuffle=False, collate_fn=collate_fn)
 
     return train_dl, dev_dl, test_dl
