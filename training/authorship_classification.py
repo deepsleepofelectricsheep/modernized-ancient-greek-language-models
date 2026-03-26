@@ -40,8 +40,8 @@ def return_arguments(arguments: argparse.Namespace = None) -> argparse.Namespace
     # Dataset arguments:
     arguments.data_dir = "data/authorship_classification"
     arguments.max_sequence_length = 512
-    arguments.batch_size = 32
-    arguments.batch_limit = 10
+    arguments.batch_size = 16
+    arguments.batch_limit = 50
 
     # Training arguments
     arguments.epochs = 2
@@ -83,7 +83,7 @@ def return_dataloaders_for_authorship_clf(
         
     def collate_fn(batch):
         # Pad to the maximum length 
-        max_sequence_length = max(max([len(sentence) for sentence, author_idx in batch]), arguments.max_sequence_length)
+        max_sequence_length = min(max([len(sentence) for sentence, author_idx in batch]), arguments.max_sequence_length)
         input_ids = torch.stack([F.pad(sentence, (0, max_sequence_length - len(sentence))) for sentence, author_idx in batch])
         author_idx = torch.tensor([author_idx for sentence, author_idx in batch])
         return {"input_ids": input_ids, "author_idx": author_idx}
@@ -124,45 +124,97 @@ def train(arguments: argparse.Namespace = None) -> None:
     history = {
         "training_loss_per_epoch": [0] * arguments.epochs,
         "dev_accuracy_per_epoch": [0] * arguments.epochs,
-        "train_accuracy_per_epoch": [0] * arguments.epochs,
-        "train_wallclock_time_per_epoch": [0] * arguments.epochs,
+        "training_accuracy_per_epoch": [0] * arguments.epochs,
+        "training_wallclock_time_per_epoch": [0] * arguments.epochs,
         "grad_norm_per_epoch": [0.0] * arguments.epochs,
     }
 
     print(f"Starting training loop...")
+
+    best_dev_acc = 0
     for epoch in range(arguments.epochs):
         model.train()
-        for batch in tqdm.tqdm(train_dl):
-            input_ids = batch["input_ids"].to(device)
-            author_idx = batch["author_idx"].to(device)
+        with tqdm.tqdm(
+            train_dl,
+            desc=f"Epoch {epoch + 1}/{arguments.epochs} Training"
+        ) as pbar:
+            for batch in pbar:
+                input_ids = batch["input_ids"].to(device)
+                author_idx = batch["author_idx"].to(device)
 
-            attention_mask = torch.ones_like(input_ids).to(device)
-            token_type_ids = torch.zeros_like(input_ids).to(device)
+                attention_mask = torch.ones_like(input_ids).to(device)
+                token_type_ids = torch.zeros_like(input_ids).to(device)
 
-            hidden_state = model(input_ids, token_type_ids, attention_mask)["last_hidden_state"][:, 0, :]
-            logits = model.head(hidden_state)
-            predictions = torch.argmax(logits, dim=-1)
+                hidden_state = model(input_ids, token_type_ids, attention_mask)["last_hidden_state"][:, 0, :]
+                logits = model.head(hidden_state)
+                predictions = torch.argmax(logits, dim=-1)
 
-            loss = loss_fn(logits, author_idx)
+                loss = loss_fn(logits, author_idx)
 
-            optimizer.zero_grad()
-            loss.backward()
+                optimizer.zero_grad()
+                loss.backward()
 
-            if arguments.gradient_clipping:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                if arguments.gradient_clipping:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
-            optimizer.step()
-            scheduler.step()
+                optimizer.step()
+                scheduler.step()
 
-            # Store per batch metrics, and track epoch metrics
-            is_correct = (predictions == author_idx).sum().item()
-            history["training_loss_per_epoch"][epoch] += loss.item()
-            history["training_accuracy_per_epoch"][epoch] += is_correct
+                # Store per batch metrics, and track epoch metrics
+                is_correct = (predictions == author_idx).sum().item()
+                history["training_loss_per_epoch"][epoch] += loss.item()
+                history["training_accuracy_per_epoch"][epoch] += is_correct
+
+                # Update progress bar
+                current_loss = f"{loss.item():.4f}"
+                current_lr = f"{scheduler.get_last_lr()[0]:.4f}"
+                pbar.set_postfix({
+                    "loss": current_loss,
+                    "lr": current_lr
+                })
 
         train_datasize = len(train_dl) * arguments.batch_size
         history["training_loss_per_epoch"][epoch] /= train_datasize
         history["training_accuracy_per_epoch"][epoch] /= train_datasize
-        print(f"Epoch: {epoch + 1} of {arguments.epochs}. Average loss: {history['training_loss_per_epoch'][epoch]}. Accuracy: {history['training_accuracy_per_epoch'][epoch]}")
+        print(
+            f"Epoch: {epoch + 1} of {arguments.epochs}. " 
+            f"Average loss: {history['training_loss_per_epoch'][epoch]}. " 
+            f"Training accuracy: {history['training_accuracy_per_epoch'][epoch]}."
+        )
+
+        model.eval()
+        with tqdm.tqdm(
+            dev_dl,
+            desc=f"Epoch {epoch + 1}/{arguments.epochs} Evaluation"
+        ) as pbar:
+            for batch in pbar:
+                input_ids = batch["input_ids"].to(device)
+                author_idx = batch["author_idx"].to(device)
+
+                attention_mask = torch.ones_like(input_ids).to(device)
+                token_type_ids = torch.zeros_like(input_ids).to(device)
+
+                hidden_state = model(input_ids, token_type_ids, attention_mask)["last_hidden_state"][:, 0, :]
+                logits = model.head(hidden_state)
+                predictions = torch.argmax(logits, dim=-1)
+
+                is_correct = (predictions == author_idx).sum().item()
+                history["dev_accuracy_per_epoch"][epoch] += is_correct
+
+        history["dev_accuracy_per_epoch"][epoch] /= train_datasize
+        print(
+            f"Epoch: {epoch + 1} of {arguments.epochs}." 
+            f"Dev accuracy: {history['dev_accuracy_per_epoch'][epoch]}." 
+        )
+
+        if history["dev_accuracy_per_epoch"][epoch] > best_dev_acc:
+            torch.save({
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
+                "history": history
+            }, f"{arguments.save_dir}/{arguments.save_fname}")            
 
 
 if __name__ == "__main__":
