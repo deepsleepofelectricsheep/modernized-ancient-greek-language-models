@@ -41,7 +41,7 @@ def return_arguments(arguments: argparse.Namespace = None) -> argparse.Namespace
     arguments.data_dir = "data/authorship_classification"
     arguments.max_sequence_length = 512
     arguments.batch_size = 16
-    arguments.batch_limit = 100
+    arguments.batch_limit = 10
 
     # Training arguments
     arguments.epochs = 2
@@ -201,7 +201,13 @@ def train(arguments: argparse.Namespace = None) -> None:
                 is_correct = (predictions == author_idx).sum().item()
                 history["dev_accuracy_per_epoch"][epoch] += is_correct
 
-        history["dev_accuracy_per_epoch"][epoch] /= train_datasize
+                accuracy = f"{is_correct/arguments.batch_size:.4f}"
+                pbar.set_postfix({
+                    "accuracy": accuracy
+                })
+
+        dev_datasize = len(dev_dl) * arguments.batch_size
+        history["dev_accuracy_per_epoch"][epoch] /= dev_datasize
         print(
             f"Epoch {epoch + 1}/{arguments.epochs}. " 
             f"Dev accuracy: {history['dev_accuracy_per_epoch'][epoch]}." 
@@ -214,9 +220,55 @@ def train(arguments: argparse.Namespace = None) -> None:
                 "optimizer_state_dict": optimizer.state_dict(),
                 "scheduler_state_dict": scheduler.state_dict(),
                 "history": history
-            }, f"{arguments.save_dir}/{arguments.save_fname}")            
+            }, f"{arguments.save_dir}/{arguments.save_fname}")
+
+
+def test(arguments: argparse.Namespace = None): 
+
+    arguments = return_arguments() if arguments is None else arguments 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Load custom BERT model after language transfer via MLM
+    checkpoint = torch.load(f"{arguments.save_dir}/{arguments.save_fname}", weights_only=True)
+    model = CustomBertModel(BertConfig.from_pretrained(arguments.checkpoint))
+    model.initialize_classification_head(arguments.n_classes)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.initialize_classification_head(n_classes=arguments.n_classes)
+    model.to(device)
+
+    _, _, test_dl = return_dataloaders_for_authorship_clf(arguments)
+
+    model.eval()
+    with tqdm.tqdm(
+        test_dl,
+        desc=f"Testing"
+    ) as pbar:
+        test_accuracy = 0
+        for batch in pbar:
+            input_ids = batch["input_ids"].to(device)
+            author_idx = batch["author_idx"].to(device)
+
+            attention_mask = torch.ones_like(input_ids).to(device)
+            token_type_ids = torch.zeros_like(input_ids).to(device)
+
+            hidden_state = model(input_ids, token_type_ids, attention_mask)["last_hidden_state"][:, 0, :]
+            logits = model.head(hidden_state)
+            predictions = torch.argmax(logits, dim=-1)
+
+            is_correct = (predictions == author_idx).sum().item()
+            test_accuracy += is_correct
+
+            print_accuracy = f"{test_accuracy/arguments.batch_size:.4f}"
+            pbar.set_postfix({
+                "accuracy": print_accuracy
+            })
+
+    test_datasize = len(test_dl) * arguments.batch_size
+    test_accuracy /= test_datasize
+    print(f"Final test accuracy: {test_accuracy:0.4f}")
 
 
 if __name__ == "__main__":
 
     train()
+    # test()
