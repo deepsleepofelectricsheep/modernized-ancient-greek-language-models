@@ -175,4 +175,11 @@ def train(arguments: argparse.Namespace = None) -> None:
 
 if __name__ == "__main__":
 
-    train()
+    arguments = return_arguments()
+    arguments.epochs = 5
+    arguments.lr = 1e-4
+    arguments.warmup_steps = 100
+    arguments.decay_steps = 100
+    arguments.file_limit = 3
+
+    train(arguments)

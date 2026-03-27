@@ -270,5 +270,11 @@ def test(arguments: argparse.Namespace = None):
 
 if __name__ == "__main__":
 
-    train()
-    # test()
+    arguments = return_arguments()
+    arguments.epochs = 5
+    arguments.lr = 1e-4
+    arguments.warmup_steps = 100
+    arguments.decay_steps = 100
+    arguments.batch_limit = 10
+
+    train(arguments)
