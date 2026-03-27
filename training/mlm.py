@@ -95,7 +95,8 @@ def return_dataloader_for_mlm(arguments: argparse.Namespace = None) -> DataLoade
             mlm_replace_with_random = (rand < 0.15) & (rand > 0.15 * 0.9)
             mlm_replace_with_mask = rand < 0.15 * 0.8
 
-            corrupted_input_ids = input_ids.masked_fill(mlm_replace_with_random==1, random.randint(0, self.tokenizer.vocab_size-1))
+            corruption = torch.randint(0, self.tokenizer.vocab_size-1, input_ids.shape)
+            corrupted_input_ids = torch.where(mlm_replace_with_random==1, input_ids, corruption)
             corrupted_input_ids = corrupted_input_ids.masked_fill(mlm_replace_with_mask==1, self.tokenizer.mask_token_id)
 
             return input_ids, corrupted_input_ids, mlm_mask
